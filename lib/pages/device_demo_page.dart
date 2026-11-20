@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'map_picker_page.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../cloud_config.dart';
 import '../services/device_location_service.dart';
@@ -164,6 +166,80 @@ class _DeviceDemoPageState extends State<DeviceDemoPage> {
     }
   }
 
+  Future<void> _openMapPicker() async {
+  if (_busy) return;
+
+  final result = await Navigator.of(context).push<LatLng>(
+    MaterialPageRoute(
+      builder: (_) => const MapPickerPage(),
+    ),
+  );
+
+  if (result == null || !mounted) return;
+
+  setState(() {
+    _latitude = result.latitude;
+    _longitude = result.longitude;
+    _locationError = null;
+  });
+
+  try {
+    await _saveDraft(showMessage: false);
+    _notice('Lokasi berhasil dikonfirmasi dan disimpan.');
+  } catch (error) {
+    _notice('Lokasi dipilih, tetapi gagal menyimpan draft: $error');
+  }
+}
+
+
+Future<void> _deleteLocalPhoto() async {
+  if (_busy || _photoPath == null) return;
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Hapus Foto Lokal?'),
+      content: const Text(
+        'Foto yang tersimpan di perangkat akan dihapus. '
+        'Foto yang sudah diunggah ke Supabase tidak ikut terhapus.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Batal'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('Hapus'),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmed != true || !mounted) return;
+
+  setState(() => _busy = true);
+
+  try {
+    final path = _photoPath!;
+
+    await _drafts.deletePermanentPhoto(path);
+
+    if (!mounted) return;
+
+    setState(() {
+      _photoPath = null;
+    });
+
+    await _saveDraft(showMessage: false);
+    _notice('Foto lokal berhasil dihapus.');
+  } catch (error) {
+    _notice('Gagal menghapus foto: $error');
+  } finally {
+    if (mounted) setState(() => _busy = false);
+  }
+}
+
   Future<void> _upload() async {
     if (_busy || !CloudConfig.enabled) return;
     if (_nameController.text.trim().isEmpty) {
@@ -245,19 +321,42 @@ class _DeviceDemoPageState extends State<DeviceDemoPage> {
             ],
           ),
           const SizedBox(height: 10),
-          if (photoExists)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.file(File(_photoPath!), height: 200, fit: BoxFit.cover),
-            )
-          else
-            const Text('Belum ada foto. Pilih foto JPG/PNG maksimal 5 MB.'),
+          
+if (photoExists) ...[
+  ClipRRect(
+    borderRadius: BorderRadius.circular(12),
+    child: Image.file(
+      File(_photoPath!),
+      height: 200,
+      fit: BoxFit.cover,
+    ),
+  ),
+  const SizedBox(height: 8),
+  OutlinedButton.icon(
+    onPressed: _busy ? null : _deleteLocalPhoto,
+    icon: const Icon(Icons.delete_outline),
+    label: const Text('Hapus Foto Lokal'),
+    style: OutlinedButton.styleFrom(
+      foregroundColor: Colors.red,
+    ),
+  ),
+] else
+  const Text('Belum ada foto. Pilih foto JPG/PNG/HEIC.'),
+
           const Divider(height: 28),
           FilledButton.tonalIcon(
             onPressed: _busy ? null : _getLocation,
             icon: const Icon(Icons.my_location),
             label: const Text('Ambil Koordinat GPS'),
           ),
+
+          const SizedBox(height: 8),
+OutlinedButton.icon(
+  onPressed: _busy ? null : _openMapPicker,
+  icon: const Icon(Icons.map),
+  label: const Text('Pilih Lokasi pada Peta'),
+),
+
           const SizedBox(height: 6),
           Text(
             _latitude == null || _longitude == null

@@ -10,9 +10,9 @@ Future<void> main() async {
   // Mode lokal dapat berjalan tanpa project / akun Supabase.
   if (CloudConfig.enabled) {
     await Supabase.initialize(
-      url: CloudConfig.url,
-      anonKey: CloudConfig.publishableKey,
-    );
+  url: CloudConfig.url,
+  publishableKey: CloudConfig.publishableKey,
+);
   }
 
   runApp(const KosFinderDeviceApp());

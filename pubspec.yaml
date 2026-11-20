@@ -40,6 +40,9 @@ dependencies:
   shared_preferences: ^2.5.6
   supabase_flutter: ^2.18.3
   sensors_plus: ^7.1.1
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
+  heif_converter: ^1.0.7
 
 dev_dependencies:
   flutter_test:
